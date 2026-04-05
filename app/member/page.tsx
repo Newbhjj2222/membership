@@ -1,96 +1,114 @@
 // app/member/page.tsx
-import React from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
-import { FaUserShield, FaUserFriends, FaHandsHelping, FaWhatsapp } from "react-icons/fa";
-
-type MemberRole = "member" | "advisor" | "sponsor";
+import { FaUserFriends, FaUserShield, FaHandsHelping, FaWhatsapp } from "react-icons/fa";
+import Link from "next/link";
+import React, { useEffect, useState } from "react";
 
 interface Member {
-  uid: string;
   username: string;
-  role: MemberRole;
-  isActive: boolean;
-  subscriptionExpiresAt?: { seconds: number };
+  role: "member" | "advisor" | "sponsor";
+  isMember: boolean;
+  subscriptionExpiresAt: { seconds: number };
 }
 
 export default async function MemberPage() {
-  // 🔹 Fetch members data (SSR)
+  // 🔹 SSR fetch members
   let members: Member[] = [];
   try {
     const snapshot = await getDocs(collection(db, "members"));
     members = snapshot.docs.map((doc) => doc.data() as Member);
-  } catch (err) {
-    console.error("SSR fetch members error:", err);
+  } catch (error) {
+    console.error("SSR fetch members error:", error);
   }
 
-  const roles: { role: MemberRole; icon: JSX.Element; color: string }[] = [
-    { role: "member", icon: <FaUserFriends size={24} />, color: "bg-blue-100" },
-    { role: "advisor", icon: <FaUserShield size={24} />, color: "bg-green-100" },
-    { role: "sponsor", icon: <FaHandsHelping size={24} />, color: "bg-yellow-100" },
-  ];
+  return <MemberPageClient members={members} />;
+}
 
-  // 🔹 Helper to render role card
-  const renderRoleCard = (role: MemberRole, icon: JSX.Element, color: string) => {
-    const filtered = members.filter((m) => m.role === role && m.isActive);
-    if (filtered.length === 0) return null;
+// =====================
+// Client Component for countdown & live updates
+// =====================
+interface MemberPageClientProps {
+  members: Member[];
+}
 
-    return (
-      <div className={`rounded-xl shadow p-5 flex flex-col gap-4 ${color}`} key={role}>
-        <div className="flex items-center gap-3">
-          {icon}
-          <h2 className="text-xl font-bold capitalize">{role}</h2>
-        </div>
-        <div className="flex flex-col gap-2">
-          {filtered.map((m) => (
-            <div
-              key={m.uid}
-              className="flex justify-between items-center p-3 bg-white rounded-lg shadow"
-            >
-              <div>
-                <p className="font-semibold">{m.username}</p>
-                <span className="text-xs text-gray-500">
-                  {role.toUpperCase()}{" "}
-                  {m.isActive ? (
-                    <span className="px-2 py-1 text-white bg-green-500 rounded-full text-[10px] ml-1">
-                      ACTIVE
-                    </span>
-                  ) : (
-                    <span className="px-2 py-1 text-white bg-red-500 rounded-full text-[10px] ml-1">
-                      EXPIRED
-                    </span>
-                  )}
-                </span>
-                <p className="text-xs text-gray-600">
-                  Expires:{" "}
-                  {m.subscriptionExpiresAt
-                    ? new Date(m.subscriptionExpiresAt.seconds * 1000).toLocaleDateString()
-                    : "-"}
-                </p>
-              </div>
-              <a
-                href="https://wa.me/250722319367"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-green-500 hover:text-green-600"
-                title="Contact on Whatsapp"
-              >
-                <FaWhatsapp size={20} />
-              </a>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+function MemberPageClient({ members }: MemberPageClientProps) {
+  const [timeLeft, setTimeLeft] = useState<{ [key: string]: string }>({});
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newTimes: { [key: string]: string } = {};
+      members.forEach((m) => {
+        const expiry = new Date(m.subscriptionExpiresAt.seconds * 1000).getTime();
+        const now = Date.now();
+        const diff = expiry - now;
+        if (diff > 0) {
+          const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+          const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+          const mins = Math.floor((diff / (1000 * 60)) % 60);
+          const secs = Math.floor((diff / 1000) % 60);
+          newTimes[m.username] = `${days}d ${hours}h ${mins}m ${secs}s`;
+        } else {
+          newTimes[m.username] = "Expired";
+        }
+      });
+      setTimeLeft(newTimes);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [members]);
+
+  const roleIcons = {
+    member: <FaUserFriends size={24} />,
+    advisor: <FaUserShield size={24} />,
+    sponsor: <FaHandsHelping size={24} />,
+  };
+
+  const roleColors = {
+    member: "bg-blue-100",
+    advisor: "bg-green-100",
+    sponsor: "bg-yellow-100",
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] p-5">
-      <h1 className="text-2xl font-bold mb-6 text-center">
+    <div className="min-h-screen p-6 bg-[var(--background)] text-[var(--foreground)] font-sans">
+      <h1 className="text-3xl font-bold mb-6 text-center">
         Your memberships in our family. Agaciro kawe niko kacu.
       </h1>
-      <div className="grid gap-6 md:grid-cols-3">
-        {roles.map((r) => renderRoleCard(r.role, r.icon, r.color))}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {(["member", "advisor", "sponsor"] as const).map((role) => {
+          const filtered = members.filter((m) => m.role === role);
+          return (
+            <div key={role} className={`p-6 rounded-xl shadow ${roleColors[role]}`}>
+              <div className="flex items-center gap-3 mb-4">
+                {roleIcons[role]}
+                <h2 className="text-xl font-semibold capitalize">{role}</h2>
+              </div>
+              {filtered.length === 0 && <p className="italic">You have no {role} role yet.</p>}
+              {filtered.map((m) => (
+                <div key={m.username} className="border-t border-gray-300 pt-3 mt-3">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">{m.username}</span>
+                    <span className="px-2 py-1 rounded-full bg-gray-200 text-sm">
+                      {m.isMember ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+                  <p className="text-sm mt-1">
+                    Expires in: {timeLeft[m.username] || "-"}
+                  </p>
+                  <Link
+                    href={`https://wa.me/250722319367`}
+                    target="_blank"
+                    className="flex items-center gap-2 mt-2 text-white bg-green-500 px-3 py-2 rounded hover:bg-green-600 transition"
+                  >
+                    <FaWhatsapp /> Contact Support
+                  </Link>
+                </div>
+              ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
