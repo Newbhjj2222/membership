@@ -55,7 +55,6 @@ const LoginPage: React.FC = () => {
       setMessage("Winjiye neza ukoresheje Google..");
       await saveGoogleUser(user);
 
-      // 🔹 Save in cookies
       setCookie("user", JSON.stringify({
         uid: user.uid,
         name: user.displayName,
@@ -124,27 +123,27 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div style={styles.container}>
+    <div className="min-h-screen flex items-center justify-center px-4 bg-[var(--background)] text-[var(--foreground)]">
       {loading && (
-        <div style={styles.loadingOverlay}>
-          <div style={styles.spinner}></div>
+        <div className="fixed inset-0 flex flex-col items-center justify-center bg-black/30 z-50">
+          <div className="w-10 h-10 border-4 border-gray-200 border-t-4 border-t-[#008489] rounded-full animate-spin mb-4"></div>
           <p>Tegereza gato...</p>
         </div>
       )}
 
-      <div style={styles.box}>
-        <h2 style={styles.title}>Sign In</h2>
+      <div className="w-full max-w-md p-8 bg-[var(--background)] rounded-lg shadow-md">
+        <h2 className="text-center text-2xl mb-4 font-semibold">Sign In</h2>
 
-        {message && <div style={styles.messageDiv}>{message}</div>}
+        {message && <div className="mb-4 text-red-500 text-center">{message}</div>}
 
-        <form onSubmit={handleLogin} style={styles.form}>
+        <form onSubmit={handleLogin} className="flex flex-col gap-3">
           <input
             type="email"
             placeholder="Email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            style={styles.input}
+            className="p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#008489]"
           />
           <input
             type="password"
@@ -152,104 +151,37 @@ const LoginPage: React.FC = () => {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            style={styles.input}
+            className="p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#008489]"
           />
-          <button type="submit" style={styles.btn}>Sign In</button>
-          <button type="button" style={styles.resetBtn} onClick={handleResetPassword}>
+          <button
+            type="submit"
+            className="p-3 bg-[#008489] text-white rounded hover:bg-[#00675f] transition"
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={handleResetPassword}
+            className="text-[#008489] text-sm text-right hover:underline"
+          >
             Forgot password?
           </button>
-          <button type="button" style={styles.googleBtn} onClick={handleGoogleLogin}>
-            <Image src="/google.svg" alt="Google" width={20} height={20}/>
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            className="flex items-center justify-center gap-2 p-3 border border-gray-300 rounded hover:bg-gray-100 transition mt-2"
+          >
+            <Image src="/google.svg" alt="Google" width={20} height={20} />
             <span>Continue with Google</span>
           </button>
         </form>
 
-        <p style={styles.registerLink}>
-          Nta konti ufite? <Link href="/register">Iyandikishe hano</Link>
+        <p className="text-center text-sm mt-4">
+          Nta konti ufite? <Link href="/register" className="text-[#008489] hover:underline">Iyandikishe hano</Link>
         </p>
       </div>
     </div>
   );
 };
-
-/* ===================== CSS IN JS ===================== */
-const styles: { [key: string]: React.CSSProperties } = {
-  container: {
-    minHeight: '100vh',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: '1rem',
-    background: '#f5f5f5',
-  },
-  box: {
-    width: '100%',
-    maxWidth: '400px',
-    padding: '2rem',
-    background: '#fff',
-    borderRadius: '8px',
-    boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
-  },
-  title: { textAlign: 'center', marginBottom: '1rem' },
-  messageDiv: { marginBottom: '1rem', color: 'red', textAlign: 'center' },
-  form: { display: 'flex', flexDirection: 'column', gap: '0.75rem' },
-  input: {
-    padding: '0.75rem',
-    borderRadius: '4px',
-    border: '1px solid #ccc',
-    fontSize: '1rem',
-  },
-  btn: {
-    padding: '0.75rem',
-    background: '#008489',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '1rem',
-  },
-  resetBtn: {
-    background: 'transparent',
-    border: 'none',
-    color: '#008489',
-    cursor: 'pointer',
-    fontSize: '0.9rem',
-    textAlign: 'right',
-  },
-  googleBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.5rem',
-    padding: '0.75rem',
-    background: '#fff',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    marginTop: '0.5rem',
-    fontSize: '1rem',
-  },
-  registerLink: { textAlign: 'center', marginTop: '1rem', fontSize: '0.9rem' },
-  loadingOverlay: {
-    position: 'fixed',
-    top:0, left:0, right:0, bottom:0,
-    display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center',
-    background:'rgba(0,0,0,0.3)',
-    zIndex: 1000
-  },
-  spinner: {
-    width: '40px', height:'40px', border:'4px solid #f3f3f3',
-    borderTop: '4px solid #008489',
-    borderRadius:'50%',
-    animation: 'spin 1s linear infinite',
-    marginBottom: '1rem'
-  },
-};
-
-/* ===================== SPINNER ANIMATION ===================== */
-if (typeof window !== 'undefined') {
-  const styleSheet = document.styleSheets[0];
-  styleSheet.insertRule(`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`, styleSheet.cssRules.length);
-}
 
 export default LoginPage;
