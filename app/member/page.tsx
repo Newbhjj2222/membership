@@ -1,8 +1,8 @@
 // app/member/page.tsx
+import React from "react";
 import { cookies } from "next/headers";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
-import React from "react";
 import { FaUserFriends, FaUserTie, FaUserShield } from "react-icons/fa";
 
 interface MemberData {
@@ -11,9 +11,7 @@ interface MemberData {
   subscriptionExpiresAt?: any; // Firestore timestamp
 }
 
-interface MemberPageProps {}
-
-const MemberPage: React.FC<MemberPageProps> = async () => {
+const MemberPage = async () => {
   // 🔹 Fata username muri cookies
   const cookieStore = cookies();
   const userCookie = cookieStore.get("user");
