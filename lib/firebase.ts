@@ -10,7 +10,7 @@ import {
 import { getAuth, Auth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSy...",
+  apiKey: "AIzaSyAvwNyhKiKFyI-r6MDDk7BH3iq7P61z594",
   authDomain: "newtalents-a7c29.firebaseapp.com",
   projectId: "newtalents-a7c29",
   storageBucket: "newtalents-a7c29.appspot.com",
