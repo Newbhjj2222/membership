@@ -1,124 +1,124 @@
 // app/member/page.tsx
-"use client";
-
-import React, { useEffect, useState } from "react";
-import { cookies } from "next/headers";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { cookies } from "next/headers";
+import React from "react";
 import { FaUserShield, FaUserFriends, FaUserTie, FaWhatsapp } from "react-icons/fa";
 
 interface MemberData {
-  username?: string | null;
+  username?: string;
   isMember?: boolean;
-  subscriptionExpiresAt?: { seconds: number; nanoseconds: number };
-  createdAt?: { seconds: number; nanoseconds: number };
+  subscriptionExpiresAt?: { seconds: number };
 }
 
-const WHATSAPP_NUMBER = "+250722319367";
+export default async function MemberPage() {
+  // 🔹 Fata username muri cookies (SSR)
+  const cookieStore = cookies();
+  const userCookie = cookieStore.get("user");
+  const username = userCookie ? JSON.parse(userCookie.value).name : null;
 
-const MemberPage: React.FC = () => {
-  const [memberData, setMemberData] = useState<MemberData | null>(null);
-  const [countdown, setCountdown] = useState<string>("");
+  let memberData: MemberData | null = null;
+  if (username) {
+    const docRef = doc(db, "members", username);
+    const snap = await getDoc(docRef);
+    memberData = snap.exists() ? (snap.data() as MemberData) : null;
+  }
 
-  // 🔹 Fata username muri cookies
-  const cookieStore: any = cookies();
-  const userCookie = cookieStore.get?.("user")?.value;
-  const username = userCookie ? JSON.parse(userCookie).name : null;
-
-  // 🔹 Fetch user data muri Firestore
-  useEffect(() => {
-    if (!username) return;
-
-    const fetchMember = async () => {
-      const docRef = doc(db, "members", username);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data() as MemberData;
-
-        // 🔹 Recalculate subscriptionExpiresAt if missing
-        if (!data.subscriptionExpiresAt && data.isMember) {
-          const now = new Date();
-          const oneYearLater = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
-          data.subscriptionExpiresAt = { seconds: Math.floor(oneYearLater.getTime() / 1000), nanoseconds: 0 };
-        }
-
-        setMemberData(data);
-      }
-    };
-
-    fetchMember();
-  }, [username]);
-
-  // 🔹 Live countdown
-  useEffect(() => {
-    if (!memberData?.isMember || !memberData.subscriptionExpiresAt) return;
-
-    const expiry = new Date(memberData.subscriptionExpiresAt.seconds * 1000);
-
-    const interval = setInterval(() => {
-      const now = new Date();
-      const diff = expiry.getTime() - now.getTime();
-
-      if (diff <= 0) {
-        setCountdown("Membership yararangiye");
-        clearInterval(interval);
-      } else {
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-        const minutes = Math.floor((diff / (1000 * 60)) % 60);
-        const seconds = Math.floor((diff / 1000) % 60);
-
-        setCountdown(`${days}d ${hours}h ${minutes}m ${seconds}s remaining`);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [memberData]);
+  const now = Date.now();
+  let remainingDays = 0;
+  if (memberData?.isMember && memberData.subscriptionExpiresAt) {
+    const expireTime = memberData.subscriptionExpiresAt.seconds * 1000;
+    remainingDays = Math.max(Math.ceil((expireTime - now) / (1000 * 60 * 60 * 24)), 0);
+  }
 
   return (
-    <div className="min-h-screen p-4 bg-[var(--background)] text-[var(--foreground)]">
-      <h1 className="text-3xl text-center font-bold mb-8">
-        Your members in our family
-      </h1>
+    <div style={styles.page}>
+      <div style={styles.card}>
+        <h1 style={styles.title}>Your members in our family</h1>
+        <p style={styles.subtitle}>Umunyamuryango wacu, inshuti yacu, umujyanama wacu</p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {/* 🔹 Umunyamuryango */}
-        <div className="bg-[var(--background)] border rounded-lg shadow p-6 flex flex-col items-center text-center relative">
-          {memberData?.isMember && (
-            <span className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-              MEMBER
-            </span>
-          )}
-          <FaUserShield size={50} className="mb-3 text-[#008489]" />
-          <h2 className="font-semibold text-lg">Umunyamuryango wacu</h2>
-          <p className="text-sm mt-2">{username || "Nta username"}</p>
-          <p className="text-sm mt-1">{countdown || "Nta membership"}</p>
-          <a
-            href={`https://wa.me/${WHATSAPP_NUMBER}?text=Muraho%20ndashaka%20ubufasha`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 flex items-center gap-2 bg-[#25D366] text-white px-4 py-2 rounded hover:bg-[#128C7E] transition"
-          >
-            <FaWhatsapp /> WhatsApp Support
-          </a>
-        </div>
+        {username ? (
+          <div style={styles.memberInfo}>
+            <h2>
+              <FaUserShield /> {username}{" "}
+              {memberData?.isMember && <span style={styles.badge}>MEMBER</span>}
+            </h2>
+            {memberData?.isMember ? (
+              <p>
+                Subscription ends in: <strong>{remainingDays} days</strong>
+              </p>
+            ) : (
+              <p>Atakiri umunyamuryango. Subscription ended.</p>
+            )}
 
-        {/* 🔹 Inshuti yacu */}
-        <div className="bg-[var(--background)] border rounded-lg shadow p-6 flex flex-col items-center text-center">
-          <FaUserFriends size={50} className="mb-3 text-[#008489]" />
-          <h2 className="font-semibold text-lg">Inshuti yacu</h2>
-          <p className="text-sm mt-1">Hano haza amakuru y’inshuti za community</p>
-        </div>
-
-        {/* 🔹 Umujyanama wacu */}
-        <div className="bg-[var(--background)] border rounded-lg shadow p-6 flex flex-col items-center text-center">
-          <FaUserTie size={50} className="mb-3 text-[#008489]" />
-          <h2 className="font-semibold text-lg">Umujyanama wacu</h2>
-          <p className="text-sm mt-1">Hano haza amakuru y’abajyanama</p>
-        </div>
+            <a
+              href="https://wa.me/250722319367"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={styles.whatsappBtn}
+            >
+              <FaWhatsapp /> Need help? Contact us
+            </a>
+          </div>
+        ) : (
+          <p>Ntuwinjiye. Please login first.</p>
+        )}
       </div>
     </div>
   );
-};
+}
 
-export default MemberPage;
+const styles = {
+  page: {
+    minHeight: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    background: "var(--background)",
+    color: "var(--foreground)",
+    padding: 20,
+  },
+  card: {
+    width: "100%",
+    maxWidth: 600,
+    background: "#fff",
+    padding: 30,
+    borderRadius: 12,
+    boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+    textAlign: "center" as const,
+  },
+  title: {
+    fontSize: "2rem",
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: "1.2rem",
+    marginBottom: 20,
+    color: "#555",
+  },
+  memberInfo: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 15,
+    alignItems: "center",
+  },
+  badge: {
+    background: "#008489",
+    color: "#fff",
+    borderRadius: 6,
+    padding: "2px 8px",
+    marginLeft: 10,
+    fontSize: "0.8rem",
+  },
+  whatsappBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    background: "#25D366",
+    color: "#fff",
+    padding: "10px 15px",
+    borderRadius: 8,
+    textDecoration: "none",
+    marginTop: 10,
+  },
+};
