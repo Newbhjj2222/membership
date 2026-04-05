@@ -1,80 +1,176 @@
 // app/member/page.tsx
-import { cookies } from "next/headers";
+import { cookies } from "next/headers"; // Server Component API
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import React from "react";
-import { FaUserShield, FaUserFriends, FaWhatsapp } from "react-icons/fa";
+import { FaUserShield, FaUserFriends, FaUserTie, FaWhatsapp } from "react-icons/fa";
 
-interface MemberData {
-  username: string;
+// 🔹 Type y'amakuru ya member
+type MemberData = {
+  phone: string;
+  username: string | null;
   isMember: boolean;
-  subscriptionExpiresAt: { seconds: number } | null;
-}
+  createdAt: { seconds: number };
+  subscriptionExpiresAt: { seconds: number };
+};
 
 export default async function MemberPage() {
+  // 🔹 Fata cookie yitwa 'user' muri SSR
   const cookieStore = cookies();
-  const userCookieValue = cookieStore.get("user")?.value;
-  const username = userCookieValue ? JSON.parse(userCookieValue).name : null;
+  const userCookie = cookieStore.get("user"); 
+  const username = userCookie ? JSON.parse(userCookie.value).name : null;
 
+  // 🔹 Fetch member data muri Firestore
   let memberData: MemberData | null = null;
   if (username) {
-    const docRef = doc(db, "members", username);
-    const snap = await getDoc(docRef);
+    const ref = doc(db, "members", username);
+    const snap = await getDoc(ref);
     if (snap.exists()) {
       memberData = snap.data() as MemberData;
     }
   }
 
-  let countdown = "";
-  const now = new Date();
+  // 🔹 Calculate remaining time for membership (seconds)
+  let remainingSeconds = 0;
+  const now = Date.now();
   if (memberData?.isMember && memberData.subscriptionExpiresAt) {
-    const expires = new Date(memberData.subscriptionExpiresAt.seconds * 1000);
-    if (expires > now) {
-      const diff = expires.getTime() - now.getTime();
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-      const minutes = Math.floor((diff / (1000 * 60)) % 60);
-      countdown = `${days}d ${hours}h ${minutes}m`;
-    }
+    remainingSeconds =
+      memberData.subscriptionExpiresAt.seconds * 1000 - now;
   }
 
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--background)] text-[var(--foreground)] p-4">
-      <h1 className="text-3xl font-bold mb-6 text-center sm:text-2xl">
-        Your members in our family
-      </h1>
+  // 🔹 Format badge and status
+  const isMember = memberData?.isMember && remainingSeconds > 0;
+  const badge = isMember ? "Active Member" : "Not a Member";
 
-      {username ? (
-        <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-md flex flex-col items-center gap-4">
-          <div className="flex items-center gap-2 text-lg">
-            <FaUserFriends className="text-green-600" /> {username}
-            {memberData?.isMember && (
-              <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-sm flex items-center gap-1">
-                <FaUserShield /> Member
-              </span>
-            )}
+  return (
+    <div style={styles.page}>
+      <main style={styles.main}>
+        <div style={styles.card}>
+          <h1 style={styles.title}>Your members in our family</h1>
+
+          <div style={styles.icons}>
+            <FaUserShield size={30} />
+            <FaUserFriends size={30} />
+            <FaUserTie size={30} />
           </div>
 
-          <p className="text-center">
-            {memberData?.isMember
-              ? countdown
-                ? `Membership expires in: ${countdown}`
-                : "Membership expired"
-              : "You are not a member"}
-          </p>
+          <div style={styles.info}>
+            <p>
+              {username
+                ? `Muraho, ${username}!`
+                : "Nta username yabonetse."}
+            </p>
+            <p>Status: <strong>{badge}</strong></p>
 
-          <a
-            href="https://wa.me/250722319367"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-2 px-4 py-2 bg-[#25D366] text-white rounded flex items-center gap-2 hover:bg-green-700 transition"
-          >
-            <FaWhatsapp /> Contact Support
-          </a>
+            {isMember && (
+              <p>
+                Membership expires in:{" "}
+                <span id="countdown">{formatTime(remainingSeconds)}</span>
+              </p>
+            )}
+
+            {/* 🔹 Whatsapp help button */}
+            <a
+              href="https://wa.me/250722319367"
+              target="_blank"
+              style={styles.whatsappButton}
+            >
+              <FaWhatsapp size={20} style={{ marginRight: 5 }} />
+              Get Help
+            </a>
+          </div>
         </div>
-      ) : (
-        <p className="text-center">No user info found in cookies.</p>
-      )}
+      </main>
+
+      {/* 🔹 Client-side countdown script */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+          const countdownElem = document.getElementById('countdown');
+          let remaining = ${remainingSeconds};
+          if(countdownElem){
+            setInterval(()=>{
+              if(remaining <=0){
+                countdownElem.innerText = 'Membership expired';
+                return;
+              }
+              remaining -=1;
+              countdownElem.innerText = formatTime(remaining);
+            },1000);
+
+            function formatTime(sec){
+              const d = Math.floor(sec/(3600*24));
+              const h = Math.floor((sec%(3600*24))/3600);
+              const m = Math.floor((sec%3600)/60);
+              const s = Math.floor(sec%60);
+              return d+'d '+h+'h '+m+'m '+s+'s';
+            }
+          }
+          `,
+        }}
+      />
     </div>
   );
+}
+
+// 🔹 Styles muri file imwe
+const styles: { [key: string]: React.CSSProperties } = {
+  page: {
+    minHeight: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    background: "#f0f4f8",
+    padding: 20,
+  },
+  main: {
+    width: "100%",
+    maxWidth: 800,
+  },
+  card: {
+    background: "#fff",
+    borderRadius: 12,
+    padding: 30,
+    boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 24,
+    marginBottom: 20,
+    fontWeight: 600,
+  },
+  icons: {
+    display: "flex",
+    gap: 15,
+    marginBottom: 20,
+  },
+  info: {
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    alignItems: "center",
+  },
+  whatsappButton: {
+    marginTop: 15,
+    display: "flex",
+    alignItems: "center",
+    background: "#25D366",
+    color: "#fff",
+    padding: "10px 15px",
+    borderRadius: 8,
+    textDecoration: "none",
+    fontWeight: 500,
+  },
+};
+
+// 🔹 Helper function for SSR formatting
+function formatTime(sec: number) {
+  const d = Math.floor(sec / (3600 * 24));
+  const h = Math.floor((sec % (3600 * 24)) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  return `${d}d ${h}h ${m}m ${s}s`;
 }
