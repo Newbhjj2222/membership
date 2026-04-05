@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import React from "react";
-import { FaUserShield, FaUserFriends, FaUserTie, FaWhatsapp } from "react-icons/fa";
+import { FaUserShield, FaUserFriends, FaWhatsapp } from "react-icons/fa";
 
 interface MemberData {
   username: string;
@@ -12,12 +12,10 @@ interface MemberData {
 }
 
 export default async function MemberPage() {
-  // 🔹 Fata username muri cookies (SSR)
   const cookieStore = cookies();
   const userCookieValue = cookieStore.get("user")?.value;
   const username = userCookieValue ? JSON.parse(userCookieValue).name : null;
 
-  // 🔹 Fetch user data muri Firestore
   let memberData: MemberData | null = null;
   if (username) {
     const docRef = doc(db, "members", username);
@@ -27,7 +25,6 @@ export default async function MemberPage() {
     }
   }
 
-  // 🔹 Guhita kora countdown niba ari member
   let countdown = "";
   const now = new Date();
   if (memberData?.isMember && memberData.subscriptionExpiresAt) {
@@ -43,7 +40,9 @@ export default async function MemberPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--background)] text-[var(--foreground)] p-4">
-      <h1 className="text-3xl font-bold mb-6 text-center">Your members in our family</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center sm:text-2xl">
+        Your members in our family
+      </h1>
 
       {username ? (
         <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-md flex flex-col items-center gap-4">
@@ -76,18 +75,6 @@ export default async function MemberPage() {
       ) : (
         <p className="text-center">No user info found in cookies.</p>
       )}
-
-      {/* 🔹 Inline CSS responsive */}
-      <style jsx>{`
-        @media (max-width: 480px) {
-          div.w-full {
-            padding: 1rem;
-          }
-          h1 {
-            font-size: 1.8rem;
-          }
-        }
-      `}</style>
     </div>
   );
 }
