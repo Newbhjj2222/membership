@@ -1,91 +1,97 @@
 // app/member/page.tsx
+import React from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
-import { FaUserShield, FaUserFriends, FaUserTie, FaWhatsapp } from "react-icons/fa";
+import { FaUserShield, FaUserFriends, FaHandsHelping, FaWhatsapp } from "react-icons/fa";
+
+type MemberRole = "member" | "advisor" | "sponsor";
 
 interface Member {
-  phone: string;
+  uid: string;
   username: string;
-  role: "member" | "umujyanama" | "umuterankunga";
-  createdAt: { seconds: number };
-  subscriptionExpiresAt: { seconds: number };
+  role: MemberRole;
+  isActive: boolean;
+  subscriptionExpiresAt?: { seconds: number };
 }
 
-export default async function MembersPage() {
-  // 🔹 Fetch members muri SSR
+export default async function MemberPage() {
+  // 🔹 Fetch members data (SSR)
   let members: Member[] = [];
   try {
-    const membersCol = collection(db, "members");
-    const snapshot = await getDocs(membersCol);
+    const snapshot = await getDocs(collection(db, "members"));
     members = snapshot.docs.map((doc) => doc.data() as Member);
-  } catch (error) {
-    console.error("SSR fetch members error:", error);
+  } catch (err) {
+    console.error("SSR fetch members error:", err);
   }
 
-  // 🔹 Helper function
-  const renderRoleCard = (role: Member["role"], icon: JSX.Element, color: string) => {
-    const filtered = members.filter((m) => m.role === role);
+  const roles: { role: MemberRole; icon: JSX.Element; color: string }[] = [
+    { role: "member", icon: <FaUserFriends size={24} />, color: "bg-blue-100" },
+    { role: "advisor", icon: <FaUserShield size={24} />, color: "bg-green-100" },
+    { role: "sponsor", icon: <FaHandsHelping size={24} />, color: "bg-yellow-100" },
+  ];
+
+  // 🔹 Helper to render role card
+  const renderRoleCard = (role: MemberRole, icon: JSX.Element, color: string) => {
+    const filtered = members.filter((m) => m.role === role && m.isActive);
+    if (filtered.length === 0) return null;
+
     return (
-      <div className="bg-white rounded-xl shadow p-5 flex flex-col justify-between">
-        <div className="flex items-center gap-3 mb-4">
-          <span className={`text-2xl ${color}`}>{icon}</span>
-          <h2 className="text-xl font-semibold capitalize">{role}</h2>
+      <div className={`rounded-xl shadow p-5 flex flex-col gap-4 ${color}`} key={role}>
+        <div className="flex items-center gap-3">
+          {icon}
+          <h2 className="text-xl font-bold capitalize">{role}</h2>
         </div>
-
-        {filtered.length === 0 ? (
-          <p className="text-gray-500">No {role}s found.</p>
-        ) : (
-          filtered.map((m) => {
-            const now = Date.now();
-            const expires = m.subscriptionExpiresAt
-              ? m.subscriptionExpiresAt.seconds * 1000
-              : 0;
-            const isActive = expires > now;
-            const remaining = expires - now;
-            const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((remaining / (1000 * 60 * 60)) % 24);
-            const minutes = Math.floor((remaining / (1000 * 60)) % 60);
-
-            return (
-              <div key={m.phone} className="border-t border-gray-200 pt-3 mt-3">
-                <p className="font-semibold">{m.username || "-"}</p>
-                {isActive && <span className="text-green-600 font-semibold text-sm">Active ✅</span>}
-                {!isActive && <span className="text-red-500 font-semibold text-sm">Expired ❌</span>}
-                {isActive && (
-                  <p className="text-gray-600 text-sm">
-                    Expires in: {days}d {hours}h {minutes}m
-                  </p>
-                )}
-                <div className="mt-2 flex gap-2">
-                  <a
-                    href={`https://wa.me/250722319367?text=Muraho! Nkeneye ubufasha ku membership yanjye`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition"
-                  >
-                    <FaWhatsapp /> Whatsapp
-                  </a>
-                  <span className="text-sm text-gray-500">Phone: {m.phone}</span>
-                </div>
+        <div className="flex flex-col gap-2">
+          {filtered.map((m) => (
+            <div
+              key={m.uid}
+              className="flex justify-between items-center p-3 bg-white rounded-lg shadow"
+            >
+              <div>
+                <p className="font-semibold">{m.username}</p>
+                <span className="text-xs text-gray-500">
+                  {role.toUpperCase()}{" "}
+                  {m.isActive ? (
+                    <span className="px-2 py-1 text-white bg-green-500 rounded-full text-[10px] ml-1">
+                      ACTIVE
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 text-white bg-red-500 rounded-full text-[10px] ml-1">
+                      EXPIRED
+                    </span>
+                  )}
+                </span>
+                <p className="text-xs text-gray-600">
+                  Expires:{" "}
+                  {m.subscriptionExpiresAt
+                    ? new Date(m.subscriptionExpiresAt.seconds * 1000).toLocaleDateString()
+                    : "-"}
+                </p>
               </div>
-            );
-          })
-        )}
+              <a
+                href="https://wa.me/250722319367"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-green-500 hover:text-green-600"
+                title="Contact on Whatsapp"
+              >
+                <FaWhatsapp size={20} />
+              </a>
+            </div>
+          ))}
+        </div>
       </div>
     );
   };
 
   return (
-    <main className="min-h-screen bg-[var(--background)] flex flex-col items-center p-6 text-[var(--foreground)]">
-      <h1 className="text-3xl font-bold mb-6 text-center">
-        Your memberships in our family. <br /> Agaciro kawe niko kacu.
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] p-5">
+      <h1 className="text-2xl font-bold mb-6 text-center">
+        Your memberships in our family. Agaciro kawe niko kacu.
       </h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl">
-        {renderRoleCard("member", <FaUserFriends />, "text-blue-500")}
-        {renderRoleCard("umujyanama", <FaUserShield />, "text-yellow-500")}
-        {renderRoleCard("umuterankunga", <FaUserTie />, "text-purple-500")}
+      <div className="grid gap-6 md:grid-cols-3">
+        {roles.map((r) => renderRoleCard(r.role, r.icon, r.color))}
       </div>
-    </main>
+    </div>
   );
 }
