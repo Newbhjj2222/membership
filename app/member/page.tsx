@@ -3,7 +3,7 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { cookies } from "next/headers";
 import Countdown from "./Countdown"; // client component
-import { FaUserShield, FaUserFriends, FaUserTie, FaWhatsapp } from "react-icons/fa";
+import { FaUserShield, FaWhatsapp } from "react-icons/fa";
 
 type MemberData = {
   phone: string;
@@ -14,14 +14,8 @@ type MemberData = {
 
 export default async function MemberPage() {
   // 🔹 Fata username muri cookies (SSR)
-  const cookieStore = cookies();
-  let userCookieValue: string | null = null;
-  for (const cookie of cookieStore) {
-    if (cookie.name === "user") {
-      userCookieValue = cookie.value;
-      break;
-    }
-  }
+  const cookieStore = await cookies(); // 🔹 await
+  const userCookieValue = cookieStore.get("user")?.value ?? null;
   const username = userCookieValue ? JSON.parse(userCookieValue).name : null;
 
   // 🔹 Fata data y'umunyamuryango muri Firestore
