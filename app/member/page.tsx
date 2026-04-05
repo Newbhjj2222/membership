@@ -9,23 +9,46 @@ interface Member {
   username: string;
   role: "member" | "advisor" | "sponsor";
   isMember: boolean;
-  subscriptionExpiresAt?: { seconds: number }; // Firestore Timestamp
+  subscriptionExpiresAt?: { seconds: number };
   phone?: string;
   badge?: string;
 }
 
-interface Props {
-  userMembership: Member | null;
-}
+// 🔹 Server Component
+export default async function MemberPage() {
+  const cookieStore = cookies();
+  const userCookie = cookieStore.get("user")?.value;
+  const username = userCookie ? JSON.parse(userCookie).name : null;
 
-export default function MemberPage({ userMembership }: Props) {
+  if (!username) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--background)] text-[var(--foreground)] p-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Nta cookie ya user ibonetse</h1>
+          <p>Winjire kugirango ubone membership yawe.</p>
+          <Link href="/" className="text-blue-600 underline mt-4 block">Subira ku home</Link>
+        </div>
+      </div>
+    );
+  }
+
+  // 🔹 Fetch members muri Firestore
+  let userMembership: Member | null = null;
+  try {
+    const snapshot = await getDocs(collection(db, "members"));
+    const members = snapshot.docs.map(doc => doc.data() as Member);
+    userMembership = members.find(m => m.username === username) || null;
+  } catch (error) {
+    console.error("Error fetching members:", error);
+  }
+
   if (!userMembership) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--background)] text-[var(--foreground)] p-4">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Ntabwo uri member</h1>
           <p>Reba niba waraguze membership cyangwa winjire neza.</p>
-          <Link href="/" className="text-blue-600 underline mt-4 block">Subira ku rubuga rwa home</Link>
+          <Link href="/" className="text-blue-600 underline mt-4 block">Subira ku home</Link>
         </div>
       </div>
     );
@@ -76,24 +99,4 @@ export default function MemberPage({ userMembership }: Props) {
       </div>
     </div>
   );
-}
-
-// 🔹 SSR to fetch user membership
-export async function getServerSideProps() {
-  const cookieStore = cookies();
-  const userCookie = cookieStore.get("user")?.value;
-  const username = userCookie ? JSON.parse(userCookie).name : null;
-
-  if (!username) return { props: { userMembership: null } };
-
-  try {
-    const snapshot = await getDocs(collection(db, "members"));
-    const members = snapshot.docs.map(doc => doc.data() as Member);
-    const userMembership = members.find(m => m.username === username) || null;
-
-    return { props: { userMembership } };
-  } catch (error) {
-    console.error("SSR fetch members error:", error);
-    return { props: { userMembership: null } };
-  }
 }
