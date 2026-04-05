@@ -1,9 +1,11 @@
-// app/member/MemberPageClient.tsx
-"use client";
-import React, { useEffect, useState } from "react";
-import { FaUserFriends, FaUserShield, FaHandsHelping, FaWhatsapp } from "react-icons/fa";
+// app/member/page.tsx
+import { cookies } from "next/headers";
 import Link from "next/link";
+import { FaUserFriends, FaUserShield, FaHandsHelping, FaWhatsapp } from "react-icons/fa";
+import { db } from "@/lib/firebase";
+import { collection, getDocs } from "firebase/firestore";
 
+// 🔹 Types
 interface Member {
   username: string;
   role: "member" | "advisor" | "sponsor";
@@ -11,48 +13,44 @@ interface Member {
   subscriptionExpiresAt: { seconds: number };
 }
 
-interface Props {
-  members: Member[];
+interface RoleCard {
+  role: "member" | "advisor" | "sponsor";
+  icon: JSX.Element;
+  color: string;
 }
 
-export default function MemberPageClient({ members }: Props) {
-  const [timeLeft, setTimeLeft] = useState<{ [key: string]: string }>({});
+// 🔹 Page (Server Component)
+export default async function MemberPage() {
+  // 🔹 Fata username muri cookies
+  const cookieStore = cookies();
+  const userCookie = cookieStore.get("user")?.value;
+  const username = userCookie ? JSON.parse(userCookie).name : null;
 
-  // 🔹 Countdown live
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const newTimes: { [key: string]: string } = {};
-      members.forEach((m) => {
-        const expiry = new Date(m.subscriptionExpiresAt.seconds * 1000).getTime();
-        const now = Date.now();
-        const diff = expiry - now;
-        if (diff > 0) {
-          const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-          const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-          const mins = Math.floor((diff / (1000 * 60)) % 60);
-          const secs = Math.floor((diff / 1000) % 60);
-          newTimes[m.username] = `${days}d ${hours}h ${mins}m ${secs}s`;
-        } else {
-          newTimes[m.username] = "Expired";
-        }
-      });
-      setTimeLeft(newTimes);
-    }, 1000);
+  let allMembers: Member[] = [];
+  if (username) {
+    try {
+      const snapshot = await getDocs(collection(db, "members"));
+      allMembers = snapshot.docs
+        .map((doc) => doc.data() as Member)
+        .filter((m) => m.username === username);
+    } catch (err) {
+      console.error("Failed to fetch members:", err);
+    }
+  }
 
-    return () => clearInterval(interval);
-  }, [members]);
+  // 🔹 Check expiration
+  const now = Date.now();
+  const membersWithStatus = allMembers.map((m) => {
+    const expires = m.subscriptionExpiresAt?.seconds ? m.subscriptionExpiresAt.seconds * 1000 : 0;
+    const isActive = expires > now;
+    return { ...m, isMember: isActive };
+  });
 
-  const roleIcons = {
-    member: <FaUserFriends size={24} />,
-    advisor: <FaUserShield size={24} />,
-    sponsor: <FaHandsHelping size={24} />,
-  };
-
-  const roleColors = {
-    member: "bg-blue-100",
-    advisor: "bg-green-100",
-    sponsor: "bg-yellow-100",
-  };
+  const roles: RoleCard[] = [
+    { role: "member", icon: <FaUserFriends size={24} />, color: "bg-blue-100" },
+    { role: "advisor", icon: <FaUserShield size={24} />, color: "bg-green-100" },
+    { role: "sponsor", icon: <FaHandsHelping size={24} />, color: "bg-yellow-100" },
+  ];
 
   return (
     <div className="min-h-screen p-6 bg-[var(--background)] text-[var(--foreground)] font-sans">
@@ -60,16 +58,26 @@ export default function MemberPageClient({ members }: Props) {
         Your memberships in our family. Agaciro kawe niko kacu.
       </h1>
 
+      {!username && (
+        <p className="text-center text-red-500">You must be logged in to see memberships.</p>
+      )}
+
+      {username && membersWithStatus.length === 0 && (
+        <p className="text-center text-red-500">
+          You are not a member yet or your membership has expired.
+        </p>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {(["member", "advisor", "sponsor"] as const).map((role) => {
-          const filtered = members.filter((m) => m.role === role);
+        {roles.map(({ role, icon, color }) => {
+          const filtered = membersWithStatus.filter((m) => m.role === role);
           return (
-            <div key={role} className={`p-6 rounded-xl shadow ${roleColors[role]}`}>
+            <div key={role} className={`p-6 rounded-xl shadow ${color}`}>
               <div className="flex items-center gap-3 mb-4">
-                {roleIcons[role]}
+                {icon}
                 <h2 className="text-xl font-semibold capitalize">{role}</h2>
               </div>
-              {filtered.length === 0 && <p className="italic">You have no {role} role yet.</p>}
+              {filtered.length === 0 && <p className="italic">You have no {role} role or it's expired.</p>}
               {filtered.map((m) => (
                 <div key={m.username} className="border-t border-gray-300 pt-3 mt-3">
                   <div className="flex justify-between items-center">
@@ -79,7 +87,10 @@ export default function MemberPageClient({ members }: Props) {
                     </span>
                   </div>
                   <p className="text-sm mt-1">
-                    Expires in: {timeLeft[m.username] || "-"}
+                    Expires at:{" "}
+                    {m.subscriptionExpiresAt?.seconds
+                      ? new Date(m.subscriptionExpiresAt.seconds * 1000).toLocaleDateString()
+                      : "-"}
                   </p>
                   <Link
                     href={`https://wa.me/250722319367`}
