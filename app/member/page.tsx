@@ -1,97 +1,125 @@
 // app/member/page.tsx
 import { cookies } from "next/headers";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { FaUserFriends, FaUserShield, FaHandsHelping, FaWhatsapp } from "react-icons/fa";
+import Image from "next/image";
 
 interface Member {
   username: string;
   role: "member" | "advisor" | "sponsor";
-  badge?: string;
   isMember: boolean;
   subscriptionExpiresAt?: { seconds: number };
 }
 
 export default async function MemberPage() {
-  const cookieStore = cookies();
+  // 🔹 Fata username muri cookies
+  const cookieStore = cookies(); 
   const userCookie = cookieStore.get("user")?.value;
   const username = userCookie ? JSON.parse(userCookie).name : null;
 
   if (!username) {
-    return <div className="p-8 text-center">Ntacyo wabonye muri cookies. Winjire mbere.</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center text-center">
+        <p>Nturi member. Winjira kugirango ubone.</p>
+      </div>
+    );
   }
 
-  // 🔹 Fetch member from Firestore
-  let members: Member[] = [];
-  try {
-    const membersCol = collection(db, "members");
-    const q = query(membersCol, where("username", "==", username));
-    const snapshot = await getDocs(q);
-    members = snapshot.docs.map((doc) => doc.data() as Member);
-  } catch (error) {
-    console.error("Error fetching members:", error);
+  // 🔹 Fata members muri Firestore
+  const snapshot = await getDocs(collection(db, "members"));
+  const allMembers: Member[] = snapshot.docs.map(doc => doc.data() as Member);
+
+  const userMembership = allMembers.find(m => m.username === username);
+
+  if (!userMembership || !userMembership.isMember) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-center">
+        <p>Nturi member cyangwa membership yawe irangiye.</p>
+      </div>
+    );
   }
 
-  if (members.length === 0) {
-    return <div className="p-8 text-center">Ntacyo wabonye. Nturi member.</div>;
-  }
-
-  // 🔹 Render cards
-  const roleIcons: Record<string, JSX.Element> = {
-    member: <FaUserFriends size={24} className="text-blue-600" />,
-    advisor: <FaUserShield size={24} className="text-green-600" />,
-    sponsor: <FaHandsHelping size={24} className="text-yellow-600" />,
+  // 🔹 Role icon mapping
+  const roleIcons: Record<Member["role"], JSX.Element> = {
+    member: <FaUserFriends size={24} />,
+    advisor: <FaUserShield size={24} />,
+    sponsor: <FaHandsHelping size={24} />,
   };
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
-      <h1 className="text-3xl font-bold mb-6 text-center">
-        Your memberships in our family. Agaciro kawe niko kacu.
-      </h1>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {members.map((m) => {
-          const expiry = m.subscriptionExpiresAt
-            ? new Date(m.subscriptionExpiresAt.seconds * 1000)
-            : null;
-          const isActive = m.isMember && expiry ? expiry > new Date() : false;
+    <div className="min-h-screen p-6 bg-[var(--background)] text-[var(--foreground)]">
+      <h1 className="text-2xl font-bold mb-6">Murakaza neza, {username}</h1>
 
-          return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* 🔹 Card ya user */}
+        <div className="bg-white p-6 rounded-xl shadow flex flex-col justify-between">
+          <div className="flex items-center gap-4 mb-4">
+            {roleIcons[userMembership.role]}
+            <h2 className="text-xl font-semibold capitalize">{userMembership.role}</h2>
+          </div>
+
+          <p className="mb-2">
+            <strong>Username:</strong> {userMembership.username}
+          </p>
+          <p className="mb-2">
+            <strong>Status:</strong> {userMembership.isMember ? "Active Member" : "Expired"}
+          </p>
+          <p className="mb-4">
+            <strong>Expires at:</strong>{" "}
+            {userMembership.subscriptionExpiresAt
+              ? new Date(userMembership.subscriptionExpiresAt.seconds * 1000).toLocaleDateString()
+              : "N/A"}
+          </p>
+
+          <a
+            href={`https://wa.me/250722319367?text=Hello ${userMembership.username}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-auto flex items-center justify-center gap-2 p-2 bg-green-500 text-white rounded hover:bg-green-600 transition"
+          >
+            <FaWhatsapp />
+            Contact Support
+          </a>
+        </div>
+
+        {/* 🔹 Placeholder cards zindi roles (optional) */}
+        {["advisor", "sponsor"].map((role) => {
+          const member = allMembers.find(m => m.role === role);
+          return member ? (
             <div
-              key={m.username + m.role}
-              className="bg-white rounded-xl shadow p-6 flex flex-col justify-between"
+              key={role}
+              className="bg-white p-6 rounded-xl shadow flex flex-col justify-between"
             >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  {roleIcons[m.role]}
-                  <h2 className="text-xl font-semibold">{m.username}</h2>
-                </div>
-                {m.badge && (
-                  <span className="bg-purple-200 text-purple-800 px-2 py-1 rounded-full text-sm">
-                    {m.badge}
-                  </span>
-                )}
+              <div className="flex items-center gap-4 mb-4">
+                {roleIcons[member.role]}
+                <h2 className="text-xl font-semibold capitalize">{member.role}</h2>
               </div>
+
               <p className="mb-2">
-                Status:{" "}
-                <span className={isActive ? "text-green-600" : "text-red-600"}>
-                  {isActive ? "Active Member" : "Membership Expired"}
-                </span>
+                <strong>Username:</strong> {member.username}
               </p>
-              {expiry && (
-                <p className="mb-2">
-                  Expires At: {expiry.toLocaleDateString()}
-                </p>
-              )}
+              <p className="mb-2">
+                <strong>Status:</strong> {member.isMember ? "Active" : "Expired"}
+              </p>
+              <p className="mb-4">
+                <strong>Expires at:</strong>{" "}
+                {member.subscriptionExpiresAt
+                  ? new Date(member.subscriptionExpiresAt.seconds * 1000).toLocaleDateString()
+                  : "N/A"}
+              </p>
+
               <a
-                href={`https://wa.me/+250722319367?text=Hello ${m.username}`}
+                href={`https://wa.me/250722319367?text=Hello ${member.username}`}
                 target="_blank"
-                rel="noreferrer"
-                className="mt-4 inline-flex items-center gap-2 justify-center bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition"
+                rel="noopener noreferrer"
+                className="mt-auto flex items-center justify-center gap-2 p-2 bg-green-500 text-white rounded hover:bg-green-600 transition"
               >
-                <FaWhatsapp /> Contact via WhatsApp
+                <FaWhatsapp />
+                Contact Support
               </a>
             </div>
-          );
+          ) : null;
         })}
       </div>
     </div>
