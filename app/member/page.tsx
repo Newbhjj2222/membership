@@ -1,30 +1,20 @@
 // app/member/page.tsx
 import { cookies } from "next/headers";
-import Link from "next/link";
-import { FaUserFriends, FaUserShield, FaHandsHelping, FaWhatsapp } from "react-icons/fa";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
-import React from "react";
+import { FaUserFriends, FaUserShield, FaHandsHelping, FaWhatsapp } from "react-icons/fa";
+import Link from "next/link";
 
-// 🔹 Types
 interface Member {
   username: string;
   role: "member" | "advisor" | "sponsor";
-  isMember: boolean;
-  subscriptionExpiresAt?: { seconds: number };
+  subscriptionExpiresAt: { seconds: number } | null;
 }
 
-interface RoleCard {
-  role: "member" | "advisor" | "sponsor";
-  icon: React.ReactNode; // ✅ React.ReactNode aho gukoresha JSX.Element
-  color: string;
-}
-
-// 🔹 Page (Server Component SSR)
 export default async function MemberPage() {
-  // 🔹 Fata username muri cookies
-  const cookieStore = cookies();
-  const userCookie = cookieStore.get("user")?.value;
+  // 🔹 Fata username muri cookies (SSR)
+  const cookieStore = await cookies();
+  const userCookie = cookieStore.get?.("user")?.value;
   const username = userCookie ? JSON.parse(userCookie).name : null;
 
   let allMembers: Member[] = [];
@@ -39,73 +29,66 @@ export default async function MemberPage() {
     }
   }
 
-  // 🔹 Check expiration
-  const now = Date.now();
-  const membersWithStatus = allMembers.map((m) => {
-    const expires = m.subscriptionExpiresAt?.seconds ? m.subscriptionExpiresAt.seconds * 1000 : 0;
-    const isActive = expires > now;
-    return { ...m, isMember: isActive };
-  });
-
-  const roles: RoleCard[] = [
-    { role: "member", icon: <FaUserFriends size={24} />, color: "bg-blue-100" },
-    { role: "advisor", icon: <FaUserShield size={24} />, color: "bg-green-100" },
-    { role: "sponsor", icon: <FaHandsHelping size={24} />, color: "bg-yellow-100" },
+  const roles = [
+    { role: "member", label: "Member", icon: <FaUserFriends size={24} />, color: "bg-blue-100" },
+    { role: "advisor", label: "Advisor", icon: <FaUserShield size={24} />, color: "bg-green-100" },
+    { role: "sponsor", label: "Sponsor", icon: <FaHandsHelping size={24} />, color: "bg-yellow-100" },
   ];
 
+  const renderRoleCard = (role: string) => {
+    const filtered = allMembers.filter((m) => m.role === role);
+    if (filtered.length === 0) return null;
+
+    const member = filtered[0];
+    const expired =
+      !member.subscriptionExpiresAt ||
+      member.subscriptionExpiresAt.seconds * 1000 < Date.now();
+
+    return (
+      <div className={`rounded-xl shadow p-5 flex flex-col justify-between ${roles.find(r => r.role === role)?.color}`}>
+        <div className="flex items-center gap-3 mb-3">
+          {roles.find(r => r.role === role)?.icon}
+          <h2 className="text-xl font-semibold">{roles.find(r => r.role === role)?.label}</h2>
+        </div>
+        <p className="mb-2">
+          <strong>Username:</strong> {member.username}
+        </p>
+        <p className="mb-2">
+          <strong>Status:</strong> {expired ? "Not a member" : "Active"}
+        </p>
+        <p className="mb-4">
+          <strong>Expires At:</strong>{" "}
+          {member.subscriptionExpiresAt
+            ? new Date(member.subscriptionExpiresAt.seconds * 1000).toLocaleDateString()
+            : "-"}
+        </p>
+        <Link
+          href={`https://wa.me/250722319367?text=Hello ${member.username}, I need support.`}
+          target="_blank"
+          className="flex items-center justify-center gap-2 p-2 bg-green-500 text-white rounded hover:bg-green-600"
+        >
+          <FaWhatsapp />
+          Contact WhatsApp
+        </Link>
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen p-6 bg-[var(--background)] text-[var(--foreground)] font-sans">
+    <div className="min-h-screen p-6 bg-[var(--background)] text-[var(--foreground)]">
       <h1 className="text-3xl font-bold mb-6 text-center">
         Your memberships in our family. Agaciro kawe niko kacu.
       </h1>
 
-      {!username && (
-        <p className="text-center text-red-500">You must be logged in to see memberships.</p>
-      )}
-
-      {username && membersWithStatus.length === 0 && (
+      {username ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {roles.map((r) => renderRoleCard(r.role))}
+        </div>
+      ) : (
         <p className="text-center text-red-500">
-          You are not a member yet or your membership has expired.
+          You are not logged in. Please login first.
         </p>
       )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {roles.map(({ role, icon, color }) => {
-          const filtered = membersWithStatus.filter((m) => m.role === role);
-          return (
-            <div key={role} className={`p-6 rounded-xl shadow ${color}`}>
-              <div className="flex items-center gap-3 mb-4">
-                {icon}
-                <h2 className="text-xl font-semibold capitalize">{role}</h2>
-              </div>
-              {filtered.length === 0 && <p className="italic">You have no {role} role or it's expired.</p>}
-              {filtered.map((m) => (
-                <div key={m.username} className="border-t border-gray-300 pt-3 mt-3">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">{m.username}</span>
-                    <span className="px-2 py-1 rounded-full bg-gray-200 text-sm">
-                      {m.isMember ? "Active" : "Inactive"}
-                    </span>
-                  </div>
-                  <p className="text-sm mt-1">
-                    Expires at:{" "}
-                    {m.subscriptionExpiresAt?.seconds
-                      ? new Date(m.subscriptionExpiresAt.seconds * 1000).toLocaleDateString()
-                      : "-"}
-                  </p>
-                  <Link
-                    href={`https://wa.me/250722319367`}
-                    target="_blank"
-                    className="flex items-center gap-2 mt-2 text-white bg-green-500 px-3 py-2 rounded hover:bg-green-600 transition"
-                  >
-                    <FaWhatsapp /> Contact Support
-                  </Link>
-                </div>
-              ))}
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
