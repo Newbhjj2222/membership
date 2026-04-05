@@ -4,22 +4,23 @@ import Link from "next/link";
 import { FaUserFriends, FaUserShield, FaHandsHelping, FaWhatsapp } from "react-icons/fa";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
+import React from "react";
 
 // 🔹 Types
 interface Member {
   username: string;
   role: "member" | "advisor" | "sponsor";
   isMember: boolean;
-  subscriptionExpiresAt: { seconds: number };
+  subscriptionExpiresAt?: { seconds: number };
 }
 
 interface RoleCard {
   role: "member" | "advisor" | "sponsor";
-  icon: JSX.Element;
+  icon: React.ReactNode; // ✅ React.ReactNode aho gukoresha JSX.Element
   color: string;
 }
 
-// 🔹 Page (Server Component)
+// 🔹 Page (Server Component SSR)
 export default async function MemberPage() {
   // 🔹 Fata username muri cookies
   const cookieStore = cookies();
