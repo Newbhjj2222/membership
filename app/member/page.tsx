@@ -8,18 +8,17 @@ import { FaUserFriends, FaUserTie, FaUserShield } from "react-icons/fa";
 interface MemberData {
   username?: string | null;
   isMember?: boolean;
-  subscriptionExpiresAt?: any; // Firestore timestamp
+  subscriptionExpiresAt?: { seconds: number; nanoseconds: number }; // Firestore timestamp
 }
 
 const MemberPage = async () => {
-  // 🔹 Fata username muri cookies
-  const cookieStore = cookies();
-  const userCookie = cookieStore.get("user");
-  const username = userCookie ? JSON.parse(userCookie.value).name : null;
+  // 🔹 Fata username muri cookies safely
+  const cookieStore: any = cookies(); // bypass type error
+  const userCookieValue = cookieStore.get?.("user")?.value;
+  const username = userCookieValue ? JSON.parse(userCookieValue).name : null;
 
   // 🔹 Fetch user data muri Firestore
   let memberData: MemberData | null = null;
-
   if (username) {
     const docRef = doc(db, "members", username);
     const docSnap = await getDoc(docRef);
@@ -28,7 +27,7 @@ const MemberPage = async () => {
     }
   }
 
-  // 🔹 Calculate countdown
+  // 🔹 Calculate countdown for membership (3 months)
   let countdownText = "Nta membership";
   let remainingDays = 0;
 
@@ -37,16 +36,16 @@ const MemberPage = async () => {
     const now = new Date();
     remainingDays = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (remainingDays > 0) {
-      countdownText = `${remainingDays} day(s) remaining`;
-    } else {
-      countdownText = "Membership yawe yararangiye";
-    }
+    countdownText = remainingDays > 0
+      ? `${remainingDays} day(s) remaining`
+      : "Membership yawe yararangiye";
   }
 
   return (
     <div className="min-h-screen p-4 bg-[var(--background)] text-[var(--foreground)]">
-      <h1 className="text-3xl text-center font-bold mb-8">Your members in our family</h1>
+      <h1 className="text-3xl text-center font-bold mb-8">
+        Your members in our family
+      </h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
         {/* 🔹 Umunyamuryango */}
