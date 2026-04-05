@@ -3,25 +3,26 @@ import { cookies } from "next/headers";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { FaUserFriends, FaUserShield, FaHandsHelping, FaWhatsapp } from "react-icons/fa";
-import Image from "next/image";
 
 interface Member {
   username: string;
   role: "member" | "advisor" | "sponsor";
   isMember: boolean;
   subscriptionExpiresAt?: { seconds: number };
+  badge?: string;
+  phone?: string;
 }
 
 export default async function MemberPage() {
-  // 🔹 Fata username muri cookies
-  const cookieStore = cookies(); 
-  const userCookie = cookieStore.get("user")?.value;
-  const username = userCookie ? JSON.parse(userCookie).name : null;
+  // 🔹 Fata cookies muri server component
+  const cookieStore = cookies();
+  const userCookie = cookieStore.get("user");
+  const username = userCookie ? JSON.parse(userCookie.value).name : null;
 
   if (!username) {
     return (
       <div className="min-h-screen flex items-center justify-center text-center">
-        <p>Nturi member. Winjira kugirango ubone.</p>
+        <p>Nturi member. Winjira kugirango ubone membership.</p>
       </div>
     );
   }
@@ -29,7 +30,6 @@ export default async function MemberPage() {
   // 🔹 Fata members muri Firestore
   const snapshot = await getDocs(collection(db, "members"));
   const allMembers: Member[] = snapshot.docs.map(doc => doc.data() as Member);
-
   const userMembership = allMembers.find(m => m.username === username);
 
   if (!userMembership || !userMembership.isMember) {
@@ -40,87 +40,66 @@ export default async function MemberPage() {
     );
   }
 
-  // 🔹 Role icon mapping
-  const roleIcons: Record<Member["role"], JSX.Element> = {
-    member: <FaUserFriends size={24} />,
-    advisor: <FaUserShield size={24} />,
-    sponsor: <FaHandsHelping size={24} />,
+  // 🔹 Map roles to icons & colors
+  const roleConfig = {
+    member: { icon: <FaUserFriends size={24} />, color: "bg-blue-100" },
+    advisor: { icon: <FaUserShield size={24} />, color: "bg-green-100" },
+    sponsor: { icon: <FaHandsHelping size={24} />, color: "bg-yellow-100" },
   };
 
   return (
-    <div className="min-h-screen p-6 bg-[var(--background)] text-[var(--foreground)]">
-      <h1 className="text-2xl font-bold mb-6">Murakaza neza, {username}</h1>
+    <div className="min-h-screen p-6 bg-gray-50">
+      <h1 className="text-3xl font-bold mb-6">Your memberships in our family</h1>
+      <h2 className="text-xl mb-4">Agaciro kawe niko kacu, {username}</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* 🔹 Card ya user */}
-        <div className="bg-white p-6 rounded-xl shadow flex flex-col justify-between">
-          <div className="flex items-center gap-4 mb-4">
-            {roleIcons[userMembership.role]}
-            <h2 className="text-xl font-semibold capitalize">{userMembership.role}</h2>
+        {/* 🔹 Card for user role */}
+        <div className={`p-6 rounded-xl shadow flex flex-col justify-between ${roleConfig[userMembership.role].color}`}>
+          <div className="flex items-center gap-3 mb-4">
+            {roleConfig[userMembership.role].icon}
+            <h3 className="text-lg font-semibold capitalize">{userMembership.role}</h3>
           </div>
-
-          <p className="mb-2">
-            <strong>Username:</strong> {userMembership.username}
-          </p>
-          <p className="mb-2">
-            <strong>Status:</strong> {userMembership.isMember ? "Active Member" : "Expired"}
-          </p>
-          <p className="mb-4">
-            <strong>Expires at:</strong>{" "}
+          {userMembership.badge && <p className="mb-2">Badge: {userMembership.badge}</p>}
+          <p>Status: {userMembership.isMember ? "Active member" : "Not a member"}</p>
+          <p>
+            Expires:{" "}
             {userMembership.subscriptionExpiresAt
               ? new Date(userMembership.subscriptionExpiresAt.seconds * 1000).toLocaleDateString()
               : "N/A"}
           </p>
-
-          <a
-            href={`https://wa.me/250722319367?text=Hello ${userMembership.username}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-auto flex items-center justify-center gap-2 p-2 bg-green-500 text-white rounded hover:bg-green-600 transition"
-          >
-            <FaWhatsapp />
-            Contact Support
-          </a>
+          {userMembership.phone && (
+            <a
+              href={`https://wa.me/${userMembership.phone}`}
+              target="_blank"
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition"
+            >
+              <FaWhatsapp />
+              WhatsApp
+            </a>
+          )}
         </div>
 
-        {/* 🔹 Placeholder cards zindi roles (optional) */}
-        {["advisor", "sponsor"].map((role) => {
-          const member = allMembers.find(m => m.role === role);
-          return member ? (
-            <div
-              key={role}
-              className="bg-white p-6 rounded-xl shadow flex flex-col justify-between"
-            >
-              <div className="flex items-center gap-4 mb-4">
-                {roleIcons[member.role]}
-                <h2 className="text-xl font-semibold capitalize">{member.role}</h2>
-              </div>
-
-              <p className="mb-2">
-                <strong>Username:</strong> {member.username}
-              </p>
-              <p className="mb-2">
-                <strong>Status:</strong> {member.isMember ? "Active" : "Expired"}
-              </p>
-              <p className="mb-4">
-                <strong>Expires at:</strong>{" "}
-                {member.subscriptionExpiresAt
-                  ? new Date(member.subscriptionExpiresAt.seconds * 1000).toLocaleDateString()
-                  : "N/A"}
-              </p>
-
-              <a
-                href={`https://wa.me/250722319367?text=Hello ${member.username}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-auto flex items-center justify-center gap-2 p-2 bg-green-500 text-white rounded hover:bg-green-600 transition"
-              >
-                <FaWhatsapp />
-                Contact Support
-              </a>
+        {/* 🔹 Optional: Advisor card */}
+        {userMembership.role !== "advisor" && (
+          <div className="p-6 rounded-xl shadow flex flex-col justify-between bg-green-50">
+            <div className="flex items-center gap-3 mb-4">
+              <FaUserShield size={24} />
+              <h3 className="text-lg font-semibold capitalize">Advisor</h3>
             </div>
-          ) : null;
-        })}
+            <p>Status: Not a member</p>
+          </div>
+        )}
+
+        {/* 🔹 Optional: Sponsor card */}
+        {userMembership.role !== "sponsor" && (
+          <div className="p-6 rounded-xl shadow flex flex-col justify-between bg-yellow-50">
+            <div className="flex items-center gap-3 mb-4">
+              <FaHandsHelping size={24} />
+              <h3 className="text-lg font-semibold capitalize">Sponsor</h3>
+            </div>
+            <p>Status: Not a member</p>
+          </div>
+        )}
       </div>
     </div>
   );
